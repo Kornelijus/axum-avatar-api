@@ -8,4 +8,6 @@ cargo run
 
 ## Configuration
 
-- `IMAGE_API_HOST` - host address for server, defaults to `0.0.0.0:8000`
+| Environment Variable | Default        | Description              |                             
+| -------------------- | -------------- | ------------------------ |
+| `IMAGE_API_HOST`     | `0.0.0.0:8000` | Host address for server. | 

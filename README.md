@@ -1,1 +1,1 @@
-# axum-avatar-api
+# axum-image-api

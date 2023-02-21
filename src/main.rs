@@ -1,4 +1,4 @@
-use std::{env::var_os, error::Error, net::SocketAddr};
+use std::{env::var_os, error::Error, io::Cursor, net::SocketAddr};
 
 use axum::{
     body::Body,
@@ -8,8 +8,9 @@ use axum::{
     routing::{post, Router},
 };
 
-mod errors;
+use image::{io::Reader as ImageReader, ImageFormat};
 
+mod errors;
 use errors::UploadError;
 
 #[tokio::main]
@@ -52,15 +53,20 @@ async fn api_image_compress(
         return Err(UploadError::InvalidFieldName { name });
     }
 
-    if !content_type.starts_with("image/") {
-        return Err(UploadError::InvalidContentType { name, content_type });
-    }
-
     let headers = &field.headers().clone();
     let bytes = field.bytes().await.unwrap();
 
-    // TODO: compress image before making response
+    let Some(image_format) = ImageFormat::from_mime_type(&content_type) else {
+        return Err(UploadError::InvalidContentType { name, content_type });
+    };
+
+    let image = ImageReader::with_format(Cursor::new(&bytes), image_format).decode()?;
+
+    // TODO: compress image here
     dbg!(name, content_type, headers);
+
+    let mut res_bytes: Vec<u8> = Vec::new();
+    image.write_to(&mut Cursor::new(&mut res_bytes), image_format)?;
 
     let mut res = Response::builder();
 
@@ -68,7 +74,10 @@ async fn api_image_compress(
         .expect("valid builder")
         .clone_from(headers);
 
-    Ok(res.status(StatusCode::OK).body(Body::from(bytes)).unwrap())
+    Ok(res
+        .status(StatusCode::OK)
+        .body(Body::from(res_bytes))
+        .unwrap())
 }
 
 async fn api_image_strip_exif(mut _multipart: Multipart) {

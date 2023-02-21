@@ -21,12 +21,20 @@ pub enum UploadError {
 
     #[error("Invalid content type '{content_type}' for field '{name}'")]
     InvalidContentType { name: String, content_type: String },
+
+    #[error("Failed to encode / decode image")]
+    FailedToProcessImage(#[from] image::ImageError),
 }
 
 impl IntoResponse for UploadError {
     fn into_response(self) -> Response {
+        let status = match self {
+            UploadError::FailedToProcessImage { .. } => StatusCode::INTERNAL_SERVER_ERROR,
+            _ => StatusCode::BAD_REQUEST,
+        };
+
         (
-            StatusCode::BAD_REQUEST,
+            status,
             Json(json!({
                 "message": self.to_string()
             })),

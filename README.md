@@ -1,5 +1,7 @@
 # axum-image-api
 
+📷 API for processing images uploaded by the user, written in Rust using Axum.
+
 ## Usage
 
 ```sh

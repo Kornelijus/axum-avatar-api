@@ -3,7 +3,7 @@ use std::{env::var_os, error::Error, net::SocketAddr};
 use axum::{
     extract::multipart::Multipart,
     http::StatusCode,
-    response::IntoResponse,
+    response::{IntoResponse, Response},
     routing::{post, Router},
     Json,
 };
@@ -28,7 +28,7 @@ pub enum UploadError {
 }
 
 impl IntoResponse for UploadError {
-    fn into_response(self) -> axum::response::Response {
+    fn into_response(self) -> Response {
         (
             StatusCode::BAD_REQUEST,
             Json(json!({

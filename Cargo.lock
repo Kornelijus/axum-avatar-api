@@ -91,6 +91,7 @@ dependencies = [
  "axum",
  "image",
  "reqwest",
+ "serde_json",
  "thiserror",
  "tokio",
 ]

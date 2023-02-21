@@ -1,44 +1,69 @@
-use std::env::var_os;
-use std::error::Error;
-use std::net::SocketAddr;
+use std::{env::var_os, error::Error, net::SocketAddr};
 
-use axum::extract::multipart::Multipart;
-use axum::http::StatusCode;
-use axum::response::IntoResponse;
-use axum::routing::{post, Router};
+use axum::{
+    extract::multipart::Multipart,
+    http::StatusCode,
+    response::IntoResponse,
+    routing::{post, Router},
+    Json,
+};
+
+use thiserror::Error;
+
+use serde_json::json;
+
+#[derive(Error, Debug)]
+pub enum UploadError {
+    #[error("Invalid field name '{name}'")]
+    InvalidFieldName { name: String },
+
+    #[error("Missing content type for field '{name}'")]
+    MissingContentType { name: String },
+
+    #[error("Missing field '{name}'")]
+    MissingField { name: String },
+
+    #[error("Invalid content type '{content_type}' for field '{name}'")]
+    InvalidContentType { name: String, content_type: String },
+}
+
+impl IntoResponse for UploadError {
+    fn into_response(self) -> axum::response::Response {
+        (
+            StatusCode::BAD_REQUEST,
+            Json(json!({
+                "message": self.to_string()
+            })),
+        )
+            .into_response()
+    }
+}
 
 async fn api_image_compress(
     mut multipart: Multipart,
-) -> Result<impl IntoResponse, (StatusCode, String)> {
-    while let Some(field) = multipart.next_field().await.unwrap() {
-        let name = field.name().unwrap();
+) -> Result<impl IntoResponse, impl IntoResponse> {
+    // not iterating over next_field() here because we only expect one field named "image"
+    let Some(field) = multipart.next_field().await.unwrap() else {
+        return Err(UploadError::MissingField { name: "image".to_string() });
+    };
 
-        match name {
-            "image" => {
-                let Some(content_type) = field.content_type() else {
-                    return Err((StatusCode::BAD_REQUEST, format!("Missing content type for field '{name}'")));
-                };
+    let Some(name) = field.name().map(String::from) else {
+        return Err(UploadError::InvalidFieldName { name: "".into() });
+    };
 
-                if !content_type.starts_with("image/") {
-                    return Err((
-                        StatusCode::BAD_REQUEST,
-                        format!("Invalid content type '{content_type}' for field '{name}'"),
-                    ));
-                }
+    let Some(content_type) = field.content_type().map(String::from) else {
+        return Err(UploadError::MissingContentType { name });
+    };
 
-                dbg!(name, content_type, field.headers());
-            }
-            "" => {
-                return Err((StatusCode::BAD_REQUEST, "Missing field name".into()));
-            }
-            _ => {
-                return Err((
-                    StatusCode::BAD_REQUEST,
-                    format!("Invalid field name '{name}'"),
-                ));
-            }
-        }
+    if name != "image" {
+        return Err(UploadError::InvalidFieldName { name });
     }
+
+    if !content_type.starts_with("image/") {
+        return Err(UploadError::InvalidContentType { name, content_type });
+    }
+
+    dbg!(name, content_type, field.headers());
 
     Ok(())
 }

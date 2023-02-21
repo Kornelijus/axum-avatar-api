@@ -1,6 +1,7 @@
 use std::{env::var_os, error::Error, net::SocketAddr};
 
 use axum::{
+    body::Body,
     extract::multipart::Multipart,
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -63,9 +64,18 @@ async fn api_image_compress(
         return Err(UploadError::InvalidContentType { name, content_type });
     }
 
-    dbg!(name, content_type, field.headers());
+    let headers = &field.headers().clone();
+    let bytes = field.bytes().await.unwrap();
 
-    Ok(())
+    // TODO: compress image before making response
+    dbg!(name, content_type, headers);
+
+    let mut res = Response::builder();
+
+    let res_headers = res.headers_mut().unwrap();
+    headers.clone_into(res_headers);
+
+    Ok(res.status(StatusCode::OK).body(Body::from(bytes)).unwrap())
 }
 
 async fn api_image_strip_exif(mut _multipart: Multipart) {

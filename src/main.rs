@@ -21,7 +21,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .route("/watermark", post(api_image_watermark));
 
     let host_addr: SocketAddr = if let Some(host_var) = var_os("IMAGE_API_HOST") {
-        host_var.into_string().expect("parses to String").parse()?
+        host_var.into_string().expect("host addr parses").parse()?
     } else {
         "0.0.0.0:8000".parse()?
     };
@@ -37,7 +37,7 @@ async fn api_image_compress(
     mut multipart: Multipart,
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     // not iterating over next_field() here because we only expect one field named "image"
-    let Some(field) = multipart.next_field().await.unwrap() else {
+    let Some(field) = multipart.next_field().await? else {
         return Err(UploadError::MissingField { name: "image".to_string() });
     };
 
@@ -54,7 +54,7 @@ async fn api_image_compress(
     }
 
     let headers = &field.headers().clone();
-    let bytes = field.bytes().await.unwrap();
+    let bytes = field.bytes().await?;
 
     let Some(image_format) = ImageFormat::from_mime_type(&content_type) else {
         return Err(UploadError::InvalidContentType { name, content_type });
@@ -77,7 +77,7 @@ async fn api_image_compress(
     Ok(res
         .status(StatusCode::OK)
         .body(Body::from(res_bytes))
-        .unwrap())
+        .expect("valid request"))
 }
 
 async fn api_image_strip_exif(mut _multipart: Multipart) {

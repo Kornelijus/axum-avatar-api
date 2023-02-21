@@ -24,6 +24,9 @@ pub enum UploadError {
 
     #[error("Failed to encode / decode image")]
     FailedToProcessImage(#[from] image::ImageError),
+
+    #[error("Failed to parse multipart request")]
+    FailedToParseMultipart(#[from] axum::extract::multipart::MultipartError),
 }
 
 impl IntoResponse for UploadError {

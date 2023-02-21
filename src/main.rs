@@ -6,38 +6,30 @@ use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
     routing::{post, Router},
-    Json,
 };
 
-use thiserror::Error;
+mod errors;
 
-use serde_json::json;
+use errors::UploadError;
 
-#[derive(Error, Debug)]
-pub enum UploadError {
-    #[error("Invalid field name '{name}'")]
-    InvalidFieldName { name: String },
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn Error>> {
+    let app = Router::new()
+        .route("/compress", post(api_image_compress))
+        .route("/strip-exif", post(api_image_strip_exif))
+        .route("/watermark", post(api_image_watermark));
 
-    #[error("Missing content type for field '{name}'")]
-    MissingContentType { name: String },
+    let host_addr: SocketAddr = if let Some(host_var) = var_os("IMAGE_API_HOST") {
+        host_var.into_string().expect("parses to String").parse()?
+    } else {
+        "0.0.0.0:8000".parse()?
+    };
 
-    #[error("Missing field '{name}'")]
-    MissingField { name: String },
+    let server = axum::Server::bind(&host_addr).serve(app.into_make_service());
+    println!("Image API listening on http://{host_addr}");
+    server.await?;
 
-    #[error("Invalid content type '{content_type}' for field '{name}'")]
-    InvalidContentType { name: String, content_type: String },
-}
-
-impl IntoResponse for UploadError {
-    fn into_response(self) -> Response {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(json!({
-                "message": self.to_string()
-            })),
-        )
-            .into_response()
-    }
+    Ok(())
 }
 
 async fn api_image_compress(
@@ -85,24 +77,4 @@ async fn api_image_strip_exif(mut _multipart: Multipart) {
 
 async fn api_image_watermark(mut _multipart: Multipart) {
     todo!()
-}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
-    let app = Router::new()
-        .route("/compress", post(api_image_compress))
-        .route("/strip-exif", post(api_image_strip_exif))
-        .route("/watermark", post(api_image_watermark));
-
-    let host_addr: SocketAddr = if let Some(host_var) = var_os("IMAGE_API_HOST") {
-        host_var.into_string().expect("parses to String").parse()?
-    } else {
-        "0.0.0.0:8000".parse()?
-    };
-
-    let server = axum::Server::bind(&host_addr).serve(app.into_make_service());
-    println!("Image API listening on http://{host_addr}");
-    server.await?;
-
-    Ok(())
 }

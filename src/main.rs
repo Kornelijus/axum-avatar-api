@@ -72,8 +72,9 @@ async fn api_image_compress(
 
     let mut res = Response::builder();
 
-    let res_headers = res.headers_mut().unwrap();
-    headers.clone_into(res_headers);
+    res.headers_mut()
+        .expect("valid builder")
+        .clone_from(headers);
 
     Ok(res.status(StatusCode::OK).body(Body::from(bytes)).unwrap())
 }

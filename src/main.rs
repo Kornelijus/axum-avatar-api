@@ -42,7 +42,7 @@ async fn api_image_compress(
     };
 
     let Some(name) = field.name().map(String::from) else {
-        return Err(UploadError::InvalidFieldName { name: "".into() });
+        return Err(UploadError::MissingFieldName);
     };
 
     let Some(content_type) = field.content_type().map(String::from) else {

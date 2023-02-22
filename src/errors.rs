@@ -13,6 +13,9 @@ pub enum UploadError {
     #[error("Invalid field name '{name}'")]
     InvalidFieldName { name: String },
 
+    #[error("Missing field name")]
+    MissingFieldName,
+
     #[error("Missing content type for field '{name}'")]
     MissingContentType { name: String },
 

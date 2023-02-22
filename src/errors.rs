@@ -36,12 +36,10 @@ impl IntoResponse for UploadError {
             _ => StatusCode::BAD_REQUEST,
         };
 
-        (
-            status,
-            Json(json!({
-                "message": self.to_string()
-            })),
-        )
-            .into_response()
+        let message = json!({
+            "message": self.to_string()
+        });
+
+        (status, Json(message)).into_response()
     }
 }

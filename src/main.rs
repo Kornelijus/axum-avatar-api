@@ -38,7 +38,7 @@ async fn api_image_compress(
 ) -> Result<impl IntoResponse, impl IntoResponse> {
     // not iterating over next_field() here because we only expect one field named "image"
     let Some(field) = multipart.next_field().await? else {
-        return Err(UploadError::MissingField { name: "image".to_string() });
+        return Err(UploadError::MissingField { name: "image".into() });
     };
 
     let Some(name) = field.name().map(String::from) else {

@@ -3,12 +3,12 @@ use std::{env::var_os, error::Error, io::Cursor, net::SocketAddr};
 use axum::{
     body::Body,
     extract::multipart::Multipart,
-    http::StatusCode,
+    http::{HeaderMap, StatusCode},
     response::{IntoResponse, Response},
     routing::{post, Router},
 };
 
-use image::{io::Reader as ImageReader, ImageFormat};
+use image::{io::Reader as ImageReader, DynamicImage, ImageFormat};
 
 mod errors;
 use errors::UploadError;
@@ -33,12 +33,48 @@ async fn main() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-async fn api_image_compress(
+async fn api_image_compress(multipart: Multipart) -> Result<impl IntoResponse, UploadError> {
+    let image_field = multipart_image_field(multipart, "image").await?;
+
+    let MultipartImageField {
+        name,
+        content_type,
+        headers,
+        ..
+    } = &image_field;
+
+    // TODO: compress image here
+    dbg!(name, content_type, headers);
+
+    Ok(multipart_image_response(&image_field).await?)
+}
+
+async fn api_image_strip_exif(mut _multipart: Multipart) {
+    todo!()
+}
+
+async fn api_image_watermark(mut _multipart: Multipart) {
+    todo!()
+}
+
+#[derive(Debug)]
+struct MultipartImageField {
+    name: String,
+    content_type: String,
+    filename: Option<String>,
+    headers: HeaderMap,
+    image: DynamicImage,
+    format: ImageFormat,
+}
+
+async fn multipart_image_field(
     mut multipart: Multipart,
-) -> Result<impl IntoResponse, impl IntoResponse> {
-    // not iterating over next_field() here because we only expect one field named "image"
+    field_name: impl Into<String>,
+) -> Result<MultipartImageField, UploadError> {
+    let field_name: String = field_name.into();
+
     let Some(field) = multipart.next_field().await? else {
-        return Err(UploadError::MissingField { name: "image".into() });
+        return Err(UploadError::MissingField { name: field_name });
     };
 
     let Some(name) = field.name().map(String::from) else {
@@ -49,41 +85,53 @@ async fn api_image_compress(
         return Err(UploadError::MissingContentType { name });
     };
 
-    if name != "image" {
+    if name != field_name {
         return Err(UploadError::InvalidFieldName { name });
     }
 
-    let headers = &field.headers().clone();
-    let bytes = field.bytes().await?;
-
-    let Some(image_format) = ImageFormat::from_mime_type(&content_type) else {
+    let Some(format) = ImageFormat::from_mime_type(&content_type) else {
         return Err(UploadError::InvalidContentType { name, content_type });
     };
 
-    let image = ImageReader::with_format(Cursor::new(&bytes), image_format).decode()?;
+    let headers = &field.headers().clone();
+    let filename = field.file_name().map(String::from);
+    let bytes = field.bytes().await?;
 
-    // TODO: compress image here
-    dbg!(name, content_type, headers);
+    let image = ImageReader::with_format(Cursor::new(&bytes), format).decode()?;
 
-    let mut res_bytes: Vec<u8> = Vec::new();
-    image.write_to(&mut Cursor::new(&mut res_bytes), image_format)?;
+    Ok(MultipartImageField {
+        name,
+        content_type,
+        headers: headers.clone(),
+        image,
+        format,
+        filename,
+    })
+}
 
-    let mut res = Response::builder();
+async fn multipart_image_response(
+    image_field: &MultipartImageField,
+) -> Result<impl IntoResponse, UploadError> {
+    let MultipartImageField {
+        content_type,
+        image,
+        format,
+        filename,
+        ..
+    } = image_field;
 
-    res.headers_mut()
-        .expect("valid builder")
-        .clone_from(headers);
+    let mut bytes = Vec::new();
+    image.write_to(&mut Cursor::new(&mut bytes), *format)?;
 
-    Ok(res
+    let response = Response::builder()
         .status(StatusCode::OK)
-        .body(Body::from(res_bytes))
-        .expect("valid request"))
-}
+        .header("Content-Type", content_type)
+        .header(
+            "Content-Disposition",
+            format!("attachment; filename=\"{}\"", filename.clone().unwrap()),
+        )
+        .body(Body::from(bytes))
+        .unwrap();
 
-async fn api_image_strip_exif(mut _multipart: Multipart) {
-    todo!()
-}
-
-async fn api_image_watermark(mut _multipart: Multipart) {
-    todo!()
+    Ok(response)
 }
